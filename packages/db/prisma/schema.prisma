@@ -42,6 +42,6 @@ model WebsiteStatus {
 }
 
 enum Status {
-  good
-  bad
+  Good
+  Bad
 }
