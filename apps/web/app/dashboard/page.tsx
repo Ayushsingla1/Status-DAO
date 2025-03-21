@@ -3,7 +3,6 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import axios from 'axios';
 
-
 const WebsiteDashboard = () => {
 
   const [websites, setWebsites] = useState([]);

@@ -1,9 +1,8 @@
 "use client"
-import { useState } from 'react';
 import Head from 'next/head';
+import { SignedIn, SignedOut, SignInButton, UserButton } from '@clerk/nextjs';
 
 const Home = () =>  {
-  const [emailSubscribe, setEmailSubscribe] = useState('');
 
   // Sample statistics for display purposes
   const stats = [
@@ -49,12 +48,14 @@ const Home = () =>  {
             <a href="#how-it-works" className="text-gray-300 hover:text-white transition-colors">How It Works</a>
             <a href="#pricing" className="text-gray-300 hover:text-white transition-colors">Pricing</a>
             <a href="#contact" className="text-gray-300 hover:text-white transition-colors">Contact</a>
-            <a href="/login" className="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-md font-medium transition-colors">
-              Login
-            </a>
-            <a href="/signup" className="bg-gradient-to-r from-indigo-500 to-purple-600 px-4 py-2 rounded-md font-medium transition-colors hover:from-indigo-600 hover:to-purple-700">
-              Sign Up Free
-            </a>
+            <div className="rounded-md font-medium transition-colors flex items-center">
+            <SignedOut>
+                <div className='px-4 py-2 bg-purple-800 rounded-md hover:cursor-pointer'><SignInButton /></div>
+            </SignedOut>
+            <SignedIn>
+              <UserButton />
+            </SignedIn>
+            </div>
           </nav>
           <button className="md:hidden text-gray-300">
             <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
@@ -65,7 +66,6 @@ const Home = () =>  {
       </header>
 
       <main>
-        {/* Hero Section */}
         <section className="relative bg-gray-900 overflow-hidden">
           <div className="absolute inset-0 z-0 opacity-20">
             <div className="absolute inset-0 bg-gradient-to-br from-indigo-900 to-purple-900"></div>
@@ -141,7 +141,6 @@ const Home = () =>  {
           </div>
         </section>
 
-        {/* Stats Section */}
         <section className="bg-gray-800 py-12">
           <div className="container mx-auto px-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
@@ -157,7 +156,6 @@ const Home = () =>  {
           </div>
         </section>
 
-        {/* Features Section */}
         <section id="features" className="py-20 bg-gray-900">
           <div className="container mx-auto px-6">
             <div className="text-center mb-16">
@@ -243,7 +241,6 @@ const Home = () =>  {
           </div>
         </section>
 
-        {/* How It Works Section */}
         <section id="how-it-works" className="py-20 bg-gray-800">
           <div className="container mx-auto px-6">
             <div className="text-center mb-16">
@@ -284,7 +281,6 @@ const Home = () =>  {
           </div>
         </section>
 
-        {/* Testimonials */}
         <section className="py-20 bg-gray-900">
           <div className="container mx-auto px-6">
             <div className="text-center mb-16">
