@@ -8,14 +8,13 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-app.get('api/v1/website-status',authMiddleware,async(req,res) => {
+app.get('/api/v1/website-status',authMiddleware,async(req,res) => {
 
     const websiteId = req.query.websiteId!;
     const userId = req.userId;
     try{
-        const result = await prisma.website.findUnique({
+        const result = await prisma.website.findMany({
             where : {
-                id : websiteId as string,
                 userId
             },
             include : {
@@ -34,7 +33,7 @@ app.get('api/v1/website-status',authMiddleware,async(req,res) => {
     }
 })
 
-app.get('/websites',authMiddleware,async(req,res) => {
+app.get('/api/v1/websites',authMiddleware,async(req,res) => {
 
     const userId = req.userId!;
     try {
@@ -63,10 +62,13 @@ app.post('/api/v1/create-website',authMiddleware,async(req,res) => {
             }
         })
         console.log(result);
-        res.send({id : result.id});
+        res.status(200).json({id : result.id});
 
     } catch (error) {
         console.log(error)
+        res.status(501).json({
+            msg : "unable to add currently try later"
+        })
     }
 })
 
@@ -82,14 +84,17 @@ app.delete('/api/v1/delete-website',authMiddleware,async(req,res) => {
             }
         })
         console.log(result);
-        res.json(result);
+        res.status(200).json({result});
         
     } catch (error) {
         console.log(error);
+        res.status(501).json({
+            msg : "unable to delete it currently"
+        })
     }
 })
 
 
-app.listen(3000,() => {
+app.listen(3001,() => {
     console.log("listening on port 3000");
 })

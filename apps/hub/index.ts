@@ -21,9 +21,9 @@ Bun.serve({
     websocket: {
         async message(ws: ServerWebSocket<unknown>, message: string) {
             const data: IncomingMessage = JSON.parse(message);
-            
+            console.log("data is : " , data);
             if (data.type === 'signup') {
-
+                console.log("sugnup buddy")
                 const verified = await verifyMessage(
                     `Signed message for ${data.data.callbackId}, ${data.data.publicKey}`,
                     data.data.publicKey,
@@ -50,6 +50,8 @@ async function signupHandler(ws: ServerWebSocket<unknown>, { ip, publicKey, sign
         },
     });
 
+    console.log(validatorDb);
+
     if (validatorDb) {
         ws.send(JSON.stringify({
             type: 'signup',
@@ -66,6 +68,8 @@ async function signupHandler(ws: ServerWebSocket<unknown>, { ip, publicKey, sign
         });
         return;
     }
+
+    console.log("hi there creating in the db");
     
     //TODO: Given the ip, return the location
     const validator = await prisma.node.create({
@@ -108,6 +112,10 @@ setInterval(async () => {
             disabled: false,
         },
     });
+
+    console.log(websitesToMonitor);
+
+    console.log(availableValidators);
 
     for (const website of websitesToMonitor) {
         availableValidators.forEach(validator => {
