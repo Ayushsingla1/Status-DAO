@@ -3,6 +3,7 @@ import cors from "cors";
 import { authMiddleware } from "./middleware";
 import {prisma} from "db/schema";
 
+
 const app = express();
 
 app.use(express.json());

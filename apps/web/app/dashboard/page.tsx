@@ -1,64 +1,86 @@
-"use client"
-import { useState, useEffect } from 'react';
-import Head from 'next/head';
-import axios from 'axios';
+"use client";
+import { useState, useEffect } from "react";
+import Head from "next/head";
+import axios from "axios";
+import { useAuth } from "@clerk/nextjs";
 
 const WebsiteDashboard = () => {
-
   const [websites, setWebsites] = useState([]);
-
-  const getWebsites = async() => {
-    const res = await axios.get(`http://localhost:3001/api/v1/website-status`);
-    console.log(res.data);
-    setWebsites(res.data);
-  }
-
-  useEffect(() => {
-    getWebsites();
-    const interval = setInterval(async() => {
-      await getWebsites();
-    }, 1000 * 60);
-
-    return () => clearInterval(interval);
-  },[]);
-  
-  const [newWebsiteUrl, setNewWebsiteUrl] = useState('');
+  const [newWebsiteUrl, setNewWebsiteUrl] = useState("");
   const [selectedWebsite, setSelectedWebsite] = useState(null);
   const [showAddForm, setShowAddForm] = useState(false);
+  const { getToken } = useAuth();
+  const [token, setToken] = useState("");
 
-  // Status color mapping
-  const statusColors = {
-    Good: 'bg-green-500',
-    Bad: 'bg-red-500',
-    disabled: 'bg-yellow-500'
+  // Fetch token on component mount
+  useEffect(() => {
+    const fetchToken = async () => {
+      const authToken = await getToken();
+      setToken(authToken);
+    };
+    fetchToken();
+  }, [getToken]);
+
+  // Fetch websites
+  const getWebsites = async () => {
+    if (!token) return; // Wait until token is available
+    try {
+      const res = await axios.get(`http://localhost:3001/api/v1/website-status`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      setWebsites(res.data);
+    } catch (error) {
+      console.error("Error fetching websites:", error);
+    }
   };
 
-  const statusLabels = {
-    Good: 'Online',
-    Bad: 'Offline',
-    disabled: 'Not Monitored'
-  };
+  // Fetch websites on mount and update every 60s
+  useEffect(() => {
+    if (token) {
+      getWebsites();
+      const interval = setInterval(getWebsites, 1000 * 60);
+      return () => clearInterval(interval);
+    }
+  }, [token]);
 
   // Add new website
-  const handleAddWebsite = async(e : any) => {
-
+  const handleAddWebsite = async (e: any) => {
     e.preventDefault();
-    if (!newWebsiteUrl.trim()) return;
+    if (!newWebsiteUrl.trim() || !token) return;
 
-    const result = await axios.post(`${process.env.DB_URL}/api/v1/create-website`,{
-      url : newWebsiteUrl
-    })
+    try {
+      const result = await axios.post(
+        `http://localhost:3001/api/v1/create-website`,
+        { url: newWebsiteUrl },
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
-    if(result.status === 200){
-      console.log("added successfully");
+      console.log("Website added:", result.data);
+      setNewWebsiteUrl(""); // Clear input
+      getWebsites(); // Refresh list
+    } catch (error) {
+      console.error("Error adding website:", error);
     }
+  };
 
-    else {
-      console.log(result.data.msg);
-    }
+  // Status color mapping
+  const statusColors: { [key: string]: string } = {
+    Good: "bg-green-500",
+    Bad: "bg-red-500",
+    disabled: "bg-yellow-500",
+  };
 
-    setNewWebsiteUrl('');
-    setShowAddForm(false);
+  const statusLabels: { [key: string]: string } = {
+    Good: "Online",
+    Bad: "Offline",
+    disabled: "Not Monitored",
   };
 
   // Remove website

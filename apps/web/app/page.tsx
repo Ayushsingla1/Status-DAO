@@ -82,7 +82,7 @@ const Home = () =>  {
                   Get instant notifications by call or email when your website experiences downtime. Our 24/7 monitoring ensures you're always the first to know.
                 </p>
                 <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4">
-                  <a href="/signup" className="bg-gradient-to-r from-indigo-500 to-purple-600 text-center px-6 py-3 rounded-lg font-medium text-lg transition-colors hover:from-indigo-600 hover:to-purple-700">
+                  <a href="/dashboard" className="bg-gradient-to-r from-indigo-500 to-purple-600 text-center px-6 py-3 rounded-lg font-medium text-lg transition-colors hover:from-indigo-600 hover:to-purple-700">
                     Start Monitoring
                   </a>
                   <a href="#how-it-works" className="bg-gray-800 text-center border border-gray-600 px-6 py-3 rounded-lg font-medium text-lg transition-colors hover:bg-gray-700">
