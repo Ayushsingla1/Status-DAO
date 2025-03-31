@@ -1,33 +1,201 @@
-"use client";
-import { useState, useEffect } from "react";
-import Head from "next/head";
-import axios from "axios";
+"use client"
+import { useEffect, useState } from 'react';
+import {
+  GlobeIcon, XCircleIcon, CheckCircleIcon,
+  AlertCircleIcon, PhoneIcon, MailIcon, PlusIcon,
+  Trash2Icon, RefreshCwIcon, BarChart2Icon, Zap,
+  ClockIcon,
+  ChevronUpIcon,
+  ChevronDownIcon
+} from 'lucide-react';
+import Navbar from '../components/Navbar';
 import { useAuth } from "@clerk/nextjs";
+import axios from "axios";
 
-const WebsiteDashboard = () => {
-  const [websites, setWebsites] = useState([]);
-  const [newWebsiteUrl, setNewWebsiteUrl] = useState("");
-  const [selectedWebsite, setSelectedWebsite] = useState(null);
-  const [showAddForm, setShowAddForm] = useState(false);
+const StatusHistorySection = ({ site }: { site: any }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  // Get last 10 status entries for the compact view
+  const recentStatus = site.status.slice(-10).reverse();
+
+  return (
+    <div className="mt-4 border-t border-slate-700 pt-3">
+      <div
+        className="flex items-center justify-between cursor-pointer"
+        onClick={() => setIsExpanded(!isExpanded)}
+      >
+        <div className="flex items-center text-gray-400">
+          <ClockIcon size={16} className="mr-2" />
+          <span className="text-sm font-medium">Status History</span>
+        </div>
+
+        {/* Compact history bars always visible */}
+        <div className="flex items-center">
+          <div className="flex items-center space-x-1 mr-3">
+            {recentStatus.map((status: any, idx: any) => (
+              <div
+                key={idx}
+                className={`h-4 w-2 rounded-sm ${status.status === 'Good' ? 'bg-teal-400' : 'bg-red-400'
+                  }`}
+              />
+            ))}
+          </div>
+
+          {isExpanded ?
+            <ChevronUpIcon size={18} className="text-gray-400" /> :
+            <ChevronDownIcon size={18} className="text-gray-400" />
+          }
+        </div>
+      </div>
+
+      {/* Expanded detailed history */}
+      {isExpanded && (
+        <div className="mt-3 bg-slate-800/50 rounded-lg p-3 max-h-64 overflow-y-auto">
+          <div className="space-y-2">
+            {site.status.slice().reverse().map((status: any, idx: any) => (
+              <div key={idx} className="flex items-center justify-between text-sm">
+                <div className="flex items-center">
+                  <div
+                    className={`w-3 h-3 rounded-full mr-2 ${status.status === 'Good' ? 'bg-teal-400' : 'bg-red-400'
+                      }`}
+                  />
+                  <span className={status.status === 'Good' ? 'text-teal-400' : 'text-red-400'}>
+                    {status.status === 'Good' ? 'Online' : 'Offline'}
+                  </span>
+                </div>
+
+                <div className="flex items-center">
+                  {status.status === 'Good' && (
+                    <span className="text-gray-400 mr-3">{status.latency}ms</span>
+                  )}
+                  <span className="text-gray-500">
+                    {new Date(status.timestamp).toLocaleString()}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+const UserDashboard = () => {
+  //   const [isScrolled,] = useState(false);
+  const [showAddSiteModal, setShowAddSiteModal] = useState(false);
+  const [newSiteUrl, setNewSiteUrl] = useState('');
   const { getToken } = useAuth();
-  const [token, setToken] = useState("");
+  const [token, setToken] = useState<string | undefined>();
 
-  // Fetch token on component mount
+  const [websites, setWebsites] = useState<any>([]);
+
+  const [emailInputModal, setEmailInputModal] = useState(false);
+  const [phoneInputModal, setPhoneInputModal] = useState(false);
+  const [contactInput, setContactInput] = useState('');
+  const [currentSite, setCurrentSite] = useState(null);
+
+  // Toggle notification preferences
+  const toggleNotification = async (site: any, type: string) => {
+    // For turning off notifications
+    if ((site.notifyByEmail === true && type === "Email") || (site.notifyByPhone === true && type === "Phone")) {
+      let url = "http://localhost:3001/api/v1/website-remove-notifications";
+      let data;
+
+      if (type === "Email") {
+        data = { type: "removeEmail", websiteId: site.id };
+      } else {
+        data = { type: "removePhone", websiteId: site.id };
+      }
+
+      try {
+        const freshToken = await getToken();
+        const result = await axios.post(url,
+          {...data},
+          {
+            headers: {
+              Authorization: `Bearer ${freshToken}`,
+              "Content-Type": "application/json"
+            }
+          }
+        );
+        console.log(result.data);
+      } catch (e) {
+        console.log("Error while updating notification settings:", e);
+      } finally {
+        getWebsites();
+      }
+    }
+    // For turning on notifications - show input modal
+    else {
+      setCurrentSite(site);
+      if (type === "Email") {
+        setEmailInputModal(true);
+      } else {
+        setPhoneInputModal(true);
+      }
+    }
+  };
+
+  // Submit contact info for notifications
+  const submitContactInfo = async (type: string) => {
+    if (!contactInput.trim() || !currentSite) return;
+
+    console.log(currentSite);
+
+    let url = "http://localhost:3001/api/v1/website-notifications";
+    let data;
+
+    if (type === "Email") {
+      data = {
+        notifyEmail: contactInput,
+        websiteId: currentSite
+      };
+      setEmailInputModal(false);
+    } else {
+      data = {
+        notifyPhone: contactInput,
+        websiteId: currentSite
+      };
+      setPhoneInputModal(false);
+    }
+
+    try {
+      const freshToken = await getToken();
+      const result = await axios.post(url,
+        {...data},
+        {
+          headers: {
+            Authorization: `Bearer ${freshToken}`,
+            "Content-Type": "application/json"
+          }
+        }
+      );
+      console.log(result.data);
+      setContactInput('');
+    } catch (e) {
+      console.log("Error while adding notification:", e);
+    } finally {
+      getWebsites();
+    }
+  };
+
   useEffect(() => {
     const fetchToken = async () => {
       const authToken = await getToken();
-      setToken(authToken);
+      setToken(authToken!);
     };
     fetchToken();
   }, [getToken]);
 
-  // Fetch websites
   const getWebsites = async () => {
-    if (!token) return; // Wait until token is available
+    if (!token) return;
     try {
+      const freshToken = await getToken();
       const res = await axios.get(`http://localhost:3001/api/v1/website-status`, {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${freshToken}`,
         },
       });
       setWebsites(res.data);
@@ -36,7 +204,6 @@ const WebsiteDashboard = () => {
     }
   };
 
-  // Fetch websites on mount and update every 60s
   useEffect(() => {
     if (token) {
       getWebsites();
@@ -45,360 +212,424 @@ const WebsiteDashboard = () => {
     }
   }, [token]);
 
-  // Add new website
-  const handleAddWebsite = async (e: any) => {
+  const handleAddSite = async (e: any) => {
     e.preventDefault();
-    if (!newWebsiteUrl.trim() || !token) return;
+    if (!newSiteUrl.trim() || !token) return;
 
     try {
+      const freshToken = await getToken();
       const result = await axios.post(
         `http://localhost:3001/api/v1/create-website`,
-        { url: newWebsiteUrl },
+        { url: newSiteUrl },
         {
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${freshToken}`,
           },
         }
       );
 
       console.log("Website added:", result.data);
-      setNewWebsiteUrl(""); // Clear input
-      getWebsites(); // Refresh list
+      setNewSiteUrl("");
+      getWebsites();
     } catch (error) {
       console.error("Error adding website:", error);
     }
   };
+  // Toggle notification preferences
+  // const toggleNotification = async(site : any, type : any) => {
 
-  // Status color mapping
-  const statusColors: { [key: string]: string } = {
-    Good: "bg-green-500",
-    Bad: "bg-red-500",
-    disabled: "bg-yellow-500",
-  };
 
-  const statusLabels: { [key: string]: string } = {
-    Good: "Online",
-    Bad: "Offline",
-    disabled: "Not Monitored",
-  };
 
-  // Remove website
-  const handleRemoveWebsite = async(id : string) => {
-    const result = await axios.delete(`${process.env.DB_URL}/delete-website`,{params : {
-      websiteId : id
-    }})
+  //   let url;
+  //   let data;
 
-    if(result.status === 200) console.log("Successfully removed website");
+  //   if((site.notifyByEmail === true && type === "Email") || (site.notifyPhone === true && type === "Phone")){
+  //     url = "https://localhost:3001/api/v1/website-remove-notifications";
 
-    else {
-      console.log(result.data.msg);
-    }
-    console.log(result.data);
-  };
-
-  // Start monitoring a website
-  // const handleStartMonitoring = (id) => {
-  //   setWebsites(websites.map(website => {
-  //     if (website.id === id) {
-  //       return { 
-  //         ...website, 
-  //         status: Math.random() > 0.2 ? 'up' : 'down',
-  //         responseTime: Math.random() * 2,
-  //         lastChecked: new Date().toISOString()
-  //       };
+  //     if(type === "Email"){
+  //       data = {type : "removeEmail"}
   //     }
-  //     return website;
-  //   }));
+  //     else {
+  //       data = {type : "removePhone"}
+  //     }
+  //   }
+
+  //   else((site.notifyByEmail === false && type === "Email") || (site.notifyPhone === false && type === "Phone")){
+  //     url = "https://localhost:3001/api/v1/website-notifications";
+
+  //     if(type === "Email"){
+  //       data = {notifyEmail : "Ayushsingla1122@gmail.com"}
+  //     }
+  //     else {
+  //       data = {notifyPhone : "9416855609"}
+  //     }
+
+  //   }
+
+  //   try {
+  //     const freshToken = await getToken();
+  //     const result = await axios.post(url,
+  //       {...data},
+  //       {headers : {
+  //         Authorization : `Bearer ${freshToken}`,
+  //         "Content-Type" : "application/json"
+  //       }}
+  //     )
+  //     console.log(result.data);
+  //   } catch(e){
+  //     console.log("Error while fetching", e)
+  //   }
+
+  //   finally{
+  //     getWebsites();
+  //   }
   // };
 
-  console.log(websites.map(w => console.log((w.status[w.status.length-1]).timestamp)));
+  const removeSite = async (id: string) => {
+    try {
 
-  return (
-    <div className="min-h-screen bg-gray-900 text-gray-100">
-      <Head>
-        <title>Website Management - StatusGuard</title>
-        <meta name="description" content="Manage your monitored websites" />
-      </Head>
+      const freshToken = await getToken();
+      const result = await axios.delete(`http://localhost:3001/api/v1/delete-website`, {
+        params: {
+          websiteId: id
+        },
+        headers: {
+          Authorization: `Bearer ${freshToken}`
+        }
+      })
+      console.log(result.data);
+      getWebsites();
+    }
+    catch (e) {
+      console.log("Error while fetching", e)
+    }
+  };
 
-      <header className="bg-gray-800 border-b border-gray-700">
-        <div className="container mx-auto py-4 px-6 flex justify-between items-center">
-          <div className="flex items-center space-x-2">
-            <svg className="w-8 h-8 text-indigo-500" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-              <path fillRule="evenodd" d="M6.625 2.655A9 9 0 0119 11a1 1 0 11-2 0 7 7 0 00-9.625-6.492 1 1 0 11-.75-1.853zM4.662 4.959A1 1 0 014.75 6.37 6.97 6.97 0 003 11a1 1 0 11-2 0 8.97 8.97 0 012.25-5.953 1 1 0 111.412-.088z" clipRule="evenodd" />
-              <path fillRule="evenodd" d="M5 11a5 5 0 1110 0 1 1 0 11-2 0 3 3 0 10-6 0c0 1.677-.345 3.276-.968 4.729a1 1 0 11-1.838-.789A9.964 9.964 0 005 11zm8.921 2.012a1 1 0 01.831 1.145 19.86 19.86 0 01-.545 2.436 1 1 0 11-1.92-.558c.207-.713.371-1.445.49-2.192a1 1 0 011.144-.83z" clipRule="evenodd" />
-            </svg>
-            <h1 className="text-2xl font-bold">StatusGuard</h1>
+  // Get status icon and color
+  const getStatusInfo = (status: any) => {
+    switch (status) {
+      case 'Good':
+        return { icon: <CheckCircleIcon size={18} />, color: 'text-teal-400', bgColor: 'bg-teal-400/20', barColor: 'bg-teal-400' };
+      case 'Bad':
+        return { icon: <XCircleIcon size={18} />, color: 'text-red-400', bgColor: 'bg-red-400/20', barColor: 'bg-red-400' };
+    }
+  };
+
+  let totalChecks = websites.reduce((sum: number, s: any) => sum + s.status.length, 0);
+
+  let overallUptime = 0;
+  let avgRes = 0;
+  for (let i = 0; i < websites.length; i++) {
+    const statusArr = websites[i].status;
+
+    if (!websites[i].disable) {
+
+      for (let j = 0; j < statusArr.length; j++) {
+        if (statusArr[j].status === 'Good') {
+          overallUptime++;
+          avgRes += statusArr[j].latency;
+        }
+      }
+    }
+  }
+
+  overallUptime = overallUptime / (totalChecks) * 100;
+  avgRes = avgRes / totalChecks;
+
+
+  return (<div className="bg-slate-950 text-gray-100 min-h-screen font-sans">
+    <Navbar />
+
+    <div className="pt-32 pb-20 px-4">
+      <div className="container mx-auto max-w-6xl">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">My Websites</h1>
+            <p className="text-gray-400">Monitor and manage your website status</p>
           </div>
-          <nav className="hidden md:flex items-center space-x-6">
-            <a href="#" className="text-white font-medium">Dashboard</a>
-            <a href="#" className="text-gray-300 hover:text-white transition-colors">Settings</a>
-            <a href="#" className="text-gray-300 hover:text-white transition-colors">Reports</a>
-            <a href="#" className="text-gray-300 hover:text-white transition-colors">Support</a>
-            <a href="#" className="bg-gray-700 hover:bg-gray-600 px-4 py-2 rounded-md font-medium transition-colors">
-              Account
-            </a>
-          </nav>
-          <button className="md:hidden text-gray-300">
-            <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-              <path fillRule="evenodd" d="M3 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zM3 15a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-            </svg>
-          </button>
-        </div>
-      </header>
-
-      <main className="container mx-auto py-8 px-6">
-        <div className="mb-8 flex justify-between items-center">
-          <h2 className="text-3xl font-bold">Website Management</h2>
-          <button 
-            onClick={() => setShowAddForm(!showAddForm)}
-            className="bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-md font-medium transition-colors flex items-center"
+          <button
+            onClick={() => setShowAddSiteModal(true)}
+            className="bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-600 hover:to-teal-600 text-white px-6 py-3 rounded-full transition font-medium flex items-center justify-center mt-4 md:mt-0"
           >
-            <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-              <path fillRule="evenodd" d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z" clipRule="evenodd" />
-            </svg>
-            Add Website
+            <PlusIcon size={18} className="mr-2" />
+            Add New Website
           </button>
         </div>
 
-        {/* Add Website Form */}
-        {showAddForm && (
-          <div className="bg-gray-800 p-6 mb-8 rounded-lg border border-gray-700">
-            <h3 className="text-xl font-bold mb-4">Add New Website</h3>
-            <form onSubmit={handleAddWebsite} className="flex flex-col md:flex-row gap-4">
-              <div className="flex-grow">
-                <label htmlFor="websiteUrl" className="block text-sm font-medium text-gray-400 mb-1">Website URL</label>
-                <input
-                  type="text"
-                  id="websiteUrl"
-                  placeholder="example.com"
-                  value={newWebsiteUrl}
-                  onChange={(e) => setNewWebsiteUrl(e.target.value)}
-                  className="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  required
-                />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          {[
+            {
+              title: 'Online Sites',
+              count: websites.filter((s: any) => s.status[(s.status.length) - 1]?.status === 'Good').length,
+              icon: <CheckCircleIcon size={24} />,
+              color: 'text-teal-400',
+              bgColor: 'bg-teal-400/10'
+            },
+            {
+              title: 'Offline Sites',
+              count: websites.filter((s: any) => s.status[(s.status.length) - 1]?.status === 'Bad').length,
+              icon: <XCircleIcon size={24} />,
+              color: 'text-red-400',
+              bgColor: 'bg-red-400/10'
+            },
+            {
+              title: 'Pending Sites',
+              count: websites.filter((s: any) => s.disable === true).length,
+              icon: <AlertCircleIcon size={24} />,
+              color: 'text-yellow-400',
+              bgColor: 'bg-yellow-400/10'
+            }
+          ].map((card, index) => (
+            <div key={index} className="border border-slate-800 bg-slate-900/80 rounded-2xl p-6 backdrop-blur-sm backdrop-filter">
+              <div className="flex items-center mb-4">
+                <div className={`p-3 rounded-xl mr-4 ${card.bgColor}`}>
+                  <span className={card.color}>{card.icon}</span>
+                </div>
+                <div>
+                  <h3 className="text-lg font-medium">{card.title}</h3>
+                  <p className={`text-2xl font-bold ${card.color}`}>{card.count}</p>
+                </div>
               </div>
-              <div className="flex items-end space-x-2">
-                <button
-                  type="submit"
-                  className="bg-indigo-600 hover:bg-indigo-700 px-6 py-2 rounded-md font-medium transition-colors"
-                >
-                  Add
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAddForm(false)}
-                  className="bg-gray-700 hover:bg-gray-600 px-6 py-2 rounded-md font-medium transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
+            </div>
+          ))}
+        </div>
 
-        {/* Status Overview */}
-        <div className="grid md:grid-cols-3 gap-6 mb-8">
-          <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-            <div className="flex justify-between items-start mb-2">
-              <h3 className="text-lg font-medium">Monitored Websites</h3>
-              <div className="bg-indigo-600/20 text-indigo-400 px-2 py-1 rounded-md text-sm font-medium">
-                {websites.filter(w => !w.disabled).length}
-              </div>
-            </div>
-            <div className="text-3xl font-bold">
-              {websites.length}
-              <span className="text-sm font-normal text-gray-400 ml-2">Total</span>
-            </div>
+        {/* Websites List */}
+        <div className="border border-slate-800 bg-slate-900/80 rounded-2xl p-6 backdrop-blur-sm backdrop-filter mb-8">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-xl font-semibold">Monitored Websites</h2>
+            <button className="text-cyan-400 flex items-center hover:text-cyan-300 transition">
+              <RefreshCwIcon size={16} className="mr-2" />
+              Refresh All
+            </button>
           </div>
-          
-          <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-            <div className="flex justify-between items-start mb-2">
-              <h3 className="text-lg font-medium">Websites Online</h3>
-              <div className="bg-green-600/20 text-green-400 px-2 py-1 rounded-md text-sm font-medium">
-                {Math.round(websites.filter(w => w.status[((w.status).length)-1].status === 'Good').length / websites.filter(w => w => w.status[((w.status).length)-1].status === 'Bad').length * 100 || 0)}%
-              </div>
-            </div>
-            <div className="text-3xl font-bold">
-              {websites.filter(w => w.status[((w.status).length)-1].status === 'Good').length}
-              <span className="text-sm font-normal text-gray-400 ml-2">Websites</span>
-            </div>
-          </div>
-          
-          <div className="bg-gray-800 p-6 rounded-lg border border-gray-700">
-            <div className="flex justify-between items-start mb-2">
-              <h3 className="text-lg font-medium">Websites Offline</h3>
-              <div className="bg-red-600/20 text-red-400 px-2 py-1 rounded-md text-sm font-medium">
-                {Math.round(websites.filter(w => w.status[((w.status).length)-1].status === 'Bad').length / websites.filter(w => w => w.status[((w.status).length)-1].status !== 'Bad').length * 100 || 0)}%
-              </div>
-            </div>
-            <div className="text-3xl font-bold">
-              {websites.filter(w => w.status[((w.status).length)-1].status === 'Bad').length}
-              <span className="text-sm font-normal text-gray-400 ml-2">Websites</span>
-            </div>
+
+          <div className="space-y-4">
+            {websites.map((site: any) => {
+              const statusInfo = getStatusInfo(site.status[(site.status.length) - 1]?.status);
+              console.log(statusInfo)
+
+              return (
+                <div key={site.id} className="border border-slate-800 bg-slate-800/30 rounded-xl p-5 backdrop-blur-sm">
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between">
+                    {/* Website URL and Status */}
+                    <div className="flex items-center mb-4 lg:mb-0">
+                      <div className={`p-2 rounded-lg mr-4 ${statusInfo?.bgColor ? (statusInfo.bgColor) : ("bg-red-40")}`}>
+                        <span className={statusInfo?.color}>{statusInfo?.icon}</span>
+                      </div>
+                      <div>
+                        <div className="flex items-center">
+                          <GlobeIcon size={16} className="text-gray-400 mr-2" />
+                          <h3 className="font-medium">{site.url}</h3>
+                        </div>
+                        <div className="flex items-center mt-1 text-sm text-gray-400">
+                          <span>Last checked: {new Date(site.status[(site.status.length) - 1]?.timestamp).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Status Bar */}
+                    <div className="lg:w-1/3 mb-4 lg:mb-0">
+                      <div className="flex items-center mb-1">
+                        <span className={`text-sm ${statusInfo?.color}`}>
+                          {site.status[(site.status.length) - 1]?.status === 'Good' ? 'Online' : site.status[(site.status.length) - 1]?.status === 'Bad' ? 'Offline' : 'Disabled'}
+                        </span>
+                        {site.status[(site.status.length) - 1]?.status === 'Good' && (
+                          <span className="text-sm text-gray-400 ml-2">
+                            Response: {site.status[(site.status.length) - 1]?.latency}ms
+                          </span>
+                        )}
+                      </div>
+                      <div className="w-full bg-slate-700 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full ${statusInfo?.barColor}`}
+                          style={{
+                            width: site.status[(site.status.length) - 1]?.status === 'Good' ? '100%' :
+                              site.status[(site.status.length) - 1]?.status === 'Bad' ? '100%' : '30%'
+                          }}>
+                        </div>
+                      </div>
+                      <StatusHistorySection site={site} />
+                    </div>
+
+                    {/* Notification Preferences */}
+                    <div className="flex items-center space-x-3">
+                      <button
+                        onClick={() => toggleNotification(site.id, 'Email')}
+                        className={`p-2 rounded-lg ${site?.notifyByEmail ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-700 text-gray-400'}`}
+                        title="Email notifications"
+                      >
+                        <MailIcon size={18} />
+                      </button>
+                      <button
+                        onClick={() => toggleNotification(site, 'Phone')}
+                        className={`p-2 rounded-lg ${site?.notifyByPhone ? 'bg-teal-500/20 text-teal-400' : 'bg-slate-700 text-gray-400'}`}
+                        title="Phone call notifications"
+                      >
+                        <PhoneIcon size={18} />
+                      </button>
+                      <button
+                        onClick={() => removeSite(site.id)}
+                        className="p-2 rounded-lg bg-slate-700 text-gray-400 hover:text-red-400 transition"
+                        title="Remove website"
+                      >
+                        <Trash2Icon size={18} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        {/* Website List and Status */}
-        <div className="grid md:grid-cols-3 gap-6">
-          {/* Website List */}
-          <div className="md:col-span-1 bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
-            <div className="p-4 border-b border-gray-700 bg-gray-700 flex justify-between items-center">
-              <h3 className="font-bold">Your Websites</h3>
-              <span className="text-sm text-gray-400">{websites.length} Total</span>
-            </div>
-            <div className="divide-y divide-gray-700 max-h-96 overflow-y-auto">
-              {websites.map(website => (
-                <div 
-                  key={website.id} 
-                  className={`p-4 flex items-center cursor-pointer hover:bg-gray-700 transition-colors ${selectedWebsite?.id === website.id ? 'bg-gray-700' : ''}`}
-                  onClick={() => setSelectedWebsite(website)}
-                >
-                  <div className="mr-3">
-                    <div className={`w-3 h-3 rounded-full ${statusColors[(website.status[website.status.length-1].status)]}`}></div>
-                  </div>
-                  <div className="flex-grow">
-                    <div className="font-medium">{website.url}</div>
-                    <div className="text-xs text-gray-400">
-                      {(!website.disabled) 
-                        ? `Last checked: ${new Date((website.status[website.status.length-1]).timestamp).toLocaleTimeString()}`
-                        : 'Not being monitored'}
-                    </div>
-                  </div>
-                  <div>
-                    <button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveWebsite(website.id);
-                      }}
-                      className="text-gray-400 hover:text-red-400 transition-colors"
-                    >
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                        <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              ))}
-              {websites.length === 0 && (
-                <div className="p-6 text-center text-gray-400">
-                  No websites added yet. Click "Add Website" to get started.
-                </div>
-              )}
-            </div>
+        {/* Stats Section */}
+        <div className="border border-slate-800 bg-slate-900/80 rounded-2xl p-6 backdrop-blur-sm backdrop-filter">
+          <div className="flex items-center mb-6">
+            <BarChart2Icon size={20} className="text-cyan-400 mr-2" />
+            <h2 className="text-xl font-semibold">Monitoring Statistics</h2>
           </div>
 
-          {/* Website Details and Status Visualization */}
-          <div className="md:col-span-2">
-            {selectedWebsite ? (
-              <div className="bg-gray-800 rounded-lg border border-gray-700 h-full">
-                <div className="p-4 border-b border-gray-700 bg-gray-700 flex justify-between items-center">
-                  <h3 className="font-bold flex items-center">
-                    <span className="mr-2">{selectedWebsite.url}</span>
-                    <span className={`text-xs px-2 py-1 rounded-full ${
-                      selectedWebsite.status[selectedWebsite.status.length - 1].status === 'Good' ? 'bg-green-200 text-green-800' : 
-                      selectedWebsite.status[selectedWebsite.status.length - 1].status === 'Bad' ? 'bg-red-200 text-red-800' : 
-                      'bg-yellow-200 text-yellow-800'
-                    }`}>
-                      {statusLabels[selectedWebsite.status[selectedWebsite.status.length - 1].status]}
-                    </span>
-                  </h3>
-                  <div>
-                    {!selectedWebsite.disabled ? (
-                      <button 
-                        onClick={() => handleStartMonitoring(selectedWebsite.id)}
-                        className="bg-green-600 hover:bg-green-700 px-3 py-1 rounded text-sm font-medium transition-colors"
-                      >
-                        Start Monitoring
-                      </button>
-                    ) : (
-                      <button 
-                        onClick={() => handleStopMonitoring(selectedWebsite.id)}
-                        className="bg-gray-600 hover:bg-gray-700 px-3 py-1 rounded text-sm font-medium transition-colors"
-                      >
-                        Stop Monitoring
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="p-6">
-                  {/* Status History Visualization */}
-                  <div className="mb-6">
-                    <h4 className="text-lg font-medium mb-4">Status History</h4>
-                    <div className="bg-gray-700 p-4 rounded-lg">
-                      {!selectedWebsite.disabled ? (
-                        <div>
-                          <div className="grid grid-cols-24 gap-1 mb-2">
-                            {[...Array(24)].map((_, i) => (
-                              <div key={i} className="h-8 rounded-sm bg-opacity-80" style={{
-                                backgroundColor: i < 18 ? 
-                                  (Math.random() > 0.1 ? '#10B981' : '#EF4444') : 
-                                  (selectedWebsite.status[selectedWebsite.status.length - 1].status === 'Good' ? '#10B981' : '#EF4444')
-                              }}></div>
-                            ))}
-                          </div>
-                          <div className="flex justify-between text-xs text-gray-400">
-                            <span>24 hours ago</span>
-                            <span>12 hours ago</span>
-                            <span>Now</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-center text-gray-400 py-6">
-                          No monitoring data available. Start monitoring to collect data.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Response Time Visualization */}
-                  <div>
-                    <h4 className="text-lg font-medium mb-4">Response Time</h4>
-                    <div className="bg-gray-700 p-4 rounded-lg">
-                      {!selectedWebsite.disabled ? (
-                        <div>
-                          <div className="mb-4">
-                            <span className="text-2xl font-bold">{selectedWebsite.status[selectedWebsite.status.length - 1].latency.toFixed(2)}s</span>
-                            <span className="text-sm text-gray-400 ml-2">Current Response Time</span>
-                          </div>
-                          <div className="w-full h-2 bg-gray-600 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-gradient-to-r from-green-500 to-green-400"
-                              style={{ width: `${Math.min(selectedWebsite.status[selectedWebsite.status.length - 1].latency / 3 * 100, 100)}%` }}
-                            ></div>
-                          </div>
-                          <div className="flex justify-between text-xs text-gray-400 mt-2">
-                            <span>0s</span>
-                            <span>1s</span>
-                            <span>2s</span>
-                            <span>3s+</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-center text-gray-400 py-6">
-                          No response time data available. Start monitoring to collect data.
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              { label: 'Total Checks', value: `${totalChecks}` },
+              { label: 'Avg. Response Time', value: `${parseInt(String(avgRes))}ms` },
+              { label: 'Overall Uptime', value: `${overallUptime}%` }
+            ].map((stat, index) => (
+              <div key={index} className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/20">
+                <div className="text-gray-400 text-sm mb-1">{stat.label}</div>
+                <div className="text-2xl font-bold">{stat.value}</div>
+                {/* <div className="text-teal-400 text-sm">{stat.trend} this week</div> */}
               </div>
-            ) : (
-              <div className="bg-gray-800 rounded-lg border border-gray-700 h-full flex items-center justify-center p-6">
-                <div className="text-center text-gray-400">
-                  <svg className="w-16 h-16 mx-auto mb-4 text-gray-600" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                    <path fillRule="evenodd" d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12zm0-9a1 1 0 011 1v4a1 1 0 11-2 0V8a1 1 0 011-1z" clipRule="evenodd" />
-                  </svg>
-                  <p className="text-xl font-medium mb-2">Select a Website</p>
-                  <p>Choose a website from the list to view detailed status information</p>
-                </div>
-              </div>
-            )}
+            ))}
           </div>
         </div>
-      </main>
+      </div>
     </div>
+
+    {emailInputModal && (
+      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+        <div className="bg-slate-900 rounded-2xl p-6 max-w-md w-full border border-slate-800">
+          <h3 className="text-xl font-bold mb-4">Add Email Notification</h3>
+          <div className="mb-4">
+            <label className="block text-gray-400 mb-2">Your Email Address</label>
+            <input
+              type="email"
+              value={contactInput}
+              onChange={(e) => setContactInput(e.target.value)}
+              placeholder="e.g. your@email.com"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            />
+          </div>
+
+          <div className="mb-6">
+            <p className="text-gray-400 text-sm">We'll send you notifications when this website goes down.</p>
+          </div>
+
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={() => {
+                setEmailInputModal(false);
+                setContactInput('');
+              }}
+              className="px-4 py-2 rounded-lg bg-slate-800 text-white"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => submitContactInfo("Email")}
+              className="bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-600 hover:to-teal-600 text-white px-4 py-2 rounded-lg transition"
+            >
+              Save Email
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Phone Input Modal */}
+    {phoneInputModal && (
+      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+        <div className="bg-slate-900 rounded-2xl p-6 max-w-md w-full border border-slate-800">
+          <h3 className="text-xl font-bold mb-4">Add Phone Notification</h3>
+          <div className="mb-4">
+            <label className="block text-gray-400 mb-2">Your Phone Number</label>
+            <input
+              type="tel"
+              value={contactInput}
+              onChange={(e) => setContactInput(e.target.value)}
+              placeholder="e.g. 1234567890"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            />
+          </div>
+
+          <div className="mb-6">
+            <p className="text-gray-400 text-sm">We'll call you when this website goes down.</p>
+          </div>
+
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={() => {
+                setPhoneInputModal(false);
+                setContactInput('');
+              }}
+              className="px-4 py-2 rounded-lg bg-slate-800 text-white"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => submitContactInfo("Phone")}
+              className="bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-600 hover:to-teal-600 text-white px-4 py-2 rounded-lg transition"
+            >
+              Save Phone
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+
+
+    {/* Add Website Modal */}
+    {showAddSiteModal && (
+      <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 px-4">
+        <div className="bg-slate-900 rounded-2xl p-6 max-w-md w-full border border-slate-800">
+          <h3 className="text-xl font-bold mb-4">Add New Website</h3>
+          <div className="mb-4">
+            <label className="block text-gray-400 mb-2">Website URL</label>
+            <input
+              type="text"
+              value={newSiteUrl}
+              onChange={(e) => setNewSiteUrl(e.target.value)}
+              placeholder="e.g. example.com"
+              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            />
+          </div>
+
+          <div className="mb-6">
+            <p className="text-gray-400 text-sm">Notification preferences can be configured after adding the website.</p>
+          </div>
+
+          <div className="flex justify-end space-x-3">
+            <button
+              onClick={() => setShowAddSiteModal(false)}
+              className="px-4 py-2 rounded-lg bg-slate-800 text-white"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleAddSite}
+              className="bg-gradient-to-r from-cyan-500 to-teal-500 hover:from-cyan-600 hover:to-teal-600 text-white px-4 py-2 rounded-lg transition"
+            >
+              Add Website
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
   );
 };
 
-export default WebsiteDashboard;
+export default UserDashboard;

@@ -1,9 +1,8 @@
 import { randomUUIDv7, type ServerWebSocket } from "bun";
 import type { IncomingMessage, SignupIncomingMessage } from "common/types";
 import { prisma } from "db/schema";
-import { PublicKey } from "@solana/web3.js";
-import nacl from "tweetnacl";
-import nacl_util from "tweetnacl-util";
+import { sendEmail } from "./email";
+import {ethers} from "ethers";
 
 const availableValidators: { validatorId: string, socket: ServerWebSocket<unknown>, publicKey: string }[] = [];
 
@@ -23,7 +22,7 @@ Bun.serve({
             const data: IncomingMessage = JSON.parse(message);
             console.log("data is : " , data);
             if (data.type === 'signup') {
-                console.log("sugnup buddy")
+                console.log("signup buddy")
                 const verified = await verifyMessage(
                     `Signed message for ${data.data.callbackId}, ${data.data.publicKey}`,
                     data.data.publicKey,
@@ -96,14 +95,9 @@ async function signupHandler(ws: ServerWebSocket<unknown>, { ip, publicKey, sign
 }
 
 async function verifyMessage(message: string, publicKey: string, signature: string) {
-    const messageBytes = nacl_util.decodeUTF8(message);
-    const result = nacl.sign.detached.verify(
-        messageBytes,
-        new Uint8Array(JSON.parse(signature)),
-        new PublicKey(publicKey).toBytes(),
-    );
 
-    return result;
+    const derivedAddress = ethers.verifyMessage(message,signature);
+    return derivedAddress.toLowerCase() === publicKey.toLowerCase();
 }
 
 setInterval(async () => {
@@ -158,8 +152,18 @@ setInterval(async () => {
                             },
                         });
                     });
+
+                    if(status === "Bad" && website.notifyByEmail){
+                        sendEmail({
+                            from: "hello@demomailtrap.co",
+                            to: website.notifyEmail,
+                            subject: `Your site ${website.url} is down`,
+                            text: 'Please take a look your site is down currently'
+                          }
+                        );
+                    }
                 }
             };
         });
     }
-}, 3 * 60 * 1000);
+}, 5 * 60 * 1000);
