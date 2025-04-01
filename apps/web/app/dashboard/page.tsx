@@ -495,7 +495,7 @@ const UserDashboard = () => {
             {[
               { label: 'Total Checks', value: `${totalChecks}` },
               { label: 'Avg. Response Time', value: `${parseInt(String(avgRes))}ms` },
-              { label: 'Overall Uptime', value: `${overallUptime}%` }
+              { label: 'Overall Uptime', value: `${overallUptime.toFixed(2)}%` }
             ].map((stat, index) => (
               <div key={index} className="bg-slate-800/30 rounded-xl p-4 border border-slate-700/20">
                 <div className="text-gray-400 text-sm mb-1">{stat.label}</div>
